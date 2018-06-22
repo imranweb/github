@@ -18,10 +18,15 @@ var GH = GH || {};
     var loader = $("#loader");
     var issueFormContainer = $( "#issue-form-container" );
     var createIssueSelectorClass = 'create-issue';
+    var msgEle = issueFormContainer.find(".msg");
+
+    var GITHUB_APP_KEY = 'B11a8xkp0WMxInG2Hivp6d8C-Pc';
+    var provider = 'github';
 
     var GRepo = {
         init: function() {
             this.bindEvents();
+            this.oAuthHandler = oAuthHandler.init(provider, GITHUB_APP_KEY);
         },
 
         bindEvents: function() {
@@ -75,7 +80,8 @@ var GH = GH || {};
             var _this = this;
             $("."+createIssueSelectorClass).on("click", function(e) {
                 e.preventDefault();
-                _this.showIssueForm($(this));
+               _this.createIssueHandler($(this));
+              
             });
         },
 
@@ -95,7 +101,8 @@ var GH = GH || {};
                   }
                 },
                 close: function() {
-                  form[ 0 ].reset();
+                    _this.dialog.form [ 0 ].reset();
+                    msgEle.html("");
                 }
             });
 
@@ -107,20 +114,32 @@ var GH = GH || {};
 
         createIssue: function(ele) {
             var url = createIssueUri.replace('{owner}', usernameInput.val()).replace('{repo}', ele.data('name'));
-            /*$.post( url, {title: "fdff", body: "ffff"})
-            .done(function( data ) {
-                alert( "Data Loaded: " + data );
-            });*/
-
+            var formData = JSON.stringify({title: this.dialog.form.get(0).title.value, body: this.dialog.form.get(0).body.value});
+            var _this = this;
             $.ajax({
-                type: "POST",
+               type: "POST",
+               headers: {"Authorization": "token " + this.oAuthHandler.accessToken},
+               /*beforeSend: function(xhr) {
+                 xhr.setRequestHeader("Authorization", "token " + _this.oAuthHandler.accessToken);
+                },*/
                 url: url,
-                data: JSON.stringify({title: "fdff", body: "ffff"})
-                //success: success,
-                //dataType: dataType
+                data: formData,
+                success: function() {
+                    _this.afterCreatIssueSuccess();
+                },
               });
-           // console.log("creating...");
+        },
 
+        afterCreatIssueSuccess: function() {
+            var _this = this;
+            msgEle.html("Issue create Successfull!");
+            setTimeout(function() {
+                _this.dialog.dialog("close");
+            }, 2000);
+        },
+
+        createIssueHandler: function(ele) {
+            this.oAuthHandler.authorize(this.showIssueForm.bind(this), ele);
         },
 
         showIssueForm: function(ele) {
@@ -132,6 +151,33 @@ var GH = GH || {};
         getRequestUri: function(username) {
             return repouri.replace('{username}', username);
         }
+    };
+
+    var oAuthHandler = {
+        accessToken: null,
+
+        init: function(provider, APP_KEY) {
+            OAuth.initialize(APP_KEY);
+            this.provider = provider;
+            return this;
+        },
+
+        authorize: function(callback, ele) {
+            //Using popup (option 1)
+            var _this = this;
+            OAuth.popup(this.provider, {cache: true})
+            .done(function(result) {
+                console.log(result);
+                _this.accessToken = result.access_token;
+                callback(ele);
+                // do some stuff with result
+            })
+            .fail(function (err) {
+                console.log("fail");
+            //handle error with err
+            });
+        }
+
     };
 
     ns.init();
